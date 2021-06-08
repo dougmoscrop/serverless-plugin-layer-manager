@@ -5,6 +5,7 @@ const {
 const {execSync} = require('child_process');
 const pascalcase = require('pascalcase');
 const fs = require('fs');
+const path = require('path');
 
 const DEFAULT_CONFIG = {
   installLayers: true,
@@ -61,12 +62,17 @@ class LayerManagerPlugin {
     verbose(this, `Config: `, this.config);
   }
 
-  installLayer(path) {
-    const nodeLayerPath = `${path}/nodejs`;
+  installLayer(basePath) {
+    const nodeLayerPath = path.join(basePath, 'nodejs');
 
     if (fs.existsSync(nodeLayerPath)) {
-      verbose(this, `Installing nodejs layer ${path}`);
-      execSync('npm install', {
+      const packageLockPath = path.join(nodeLayerPath, 'package-lock.json');
+      const installCommand = fs.existsSync(packageLockPath)
+        ? 'npm ci'
+        : 'npm install';
+      log(installCommand);
+      verbose(this, `Installing nodejs layer ${nodeLayerPath} via ${installCommand}`);
+      execSync(installCommand, {
         stdio: 'inherit',
         cwd: nodeLayerPath
       });
@@ -124,7 +130,7 @@ class LayerManagerPlugin {
           info(this, `Replacing references to ${resourceRef} with ${versionedResourceRef}`);
 
           Object.entries(cf.Resources)
-            .forEach(([id, {Type: type, Properties: {Layers: layers = []} = {}}]) => {
+            .forEach(([id, {Type: type, Properties: {Layers: layers = [], Environment: environment = {}} = {}}]) => {
               if (type === 'AWS::Lambda::Function') {
                 layers.forEach(layer => {
                   if (layer.Ref === resourceRef) {
@@ -133,6 +139,12 @@ class LayerManagerPlugin {
                     result.upgradedLayerReferences.push(layer);
                   }
                 })
+                const { Variables: variables = {} } = environment;
+                Object.values(variables).forEach(variable => {
+                  if (variable.Ref === resourceRef) {
+                    variable.Ref = versionedResourceRef;
+                  }
+                });
               }
             });
         }
