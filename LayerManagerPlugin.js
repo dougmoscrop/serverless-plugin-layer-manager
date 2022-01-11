@@ -66,10 +66,7 @@ class LayerManagerPlugin {
     const nodeLayerPath = path.join(basePath, 'nodejs');
 
     if (fs.existsSync(nodeLayerPath)) {
-      const packageLockPath = path.join(nodeLayerPath, 'package-lock.json');
-      const installCommand = fs.existsSync(packageLockPath)
-        ? 'npm ci'
-        : 'npm install';
+      const installCommand = 'npm install';
       log(installCommand);
       verbose(this, `Installing nodejs layer ${nodeLayerPath} via ${installCommand}`);
       execSync(installCommand, {
